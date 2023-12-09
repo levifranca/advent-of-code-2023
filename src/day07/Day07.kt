@@ -18,8 +18,7 @@ fun main() {
     // test if implementation meets criteria from the description, like:
     val testInput = readInput("day07/Day07_test")
     check(part1(testInput) == 6440)
-    val testInput2 = readInput("day07/Day07_test")
-    check(part2(testInput2) == 5905)
+    check(part2(testInput) == 5905)
 
     val input = readInput("day07/Day07")
     part1(input).println()

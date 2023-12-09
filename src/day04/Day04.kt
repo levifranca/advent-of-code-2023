@@ -31,8 +31,7 @@ fun main() {
     // test if implementation meets criteria from the description, like:
     val testInput = readInput("day04/Day04_test")
     check(part1(testInput) == 13)
-    val testInput2 = readInput("day04/Day04_test")
-    check(part2(testInput2) == 30)
+    check(part2(testInput) == 30)
 
     val input = readInput("day04/Day04")
     part1(input).println()

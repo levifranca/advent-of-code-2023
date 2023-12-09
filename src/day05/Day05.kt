@@ -17,8 +17,7 @@ fun main() {
     // test if implementation meets criteria from the description, like:
     val testInput = readInput("day05/Day05_test")
     check(part1(testInput) == 35L)
-    val testInput2 = readInput("day05/Day05_test")
-    check(part2(testInput2) == 46L)
+    check(part2(testInput) == 46L)
 
     val input = readInput("day05/Day05")
     val startPart1 = Instant.now()
