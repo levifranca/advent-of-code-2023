@@ -33,18 +33,9 @@ fun main() {
     part2(input).println()
 }
 
-private fun Array<Array<Tile>>.print() {
-    this.forEach {tiles ->
-        tiles.forEach {
-            print(it.pipe)
-        }
-        kotlin.io.println()
-    }
-}
-
 data class PipeNetwork(
-    val pipesGrid: Array<Array<Tile>>,
-    val startingTile: Tile
+    private val pipesGrid: PipeGrid,
+    private val startingTile: Tile
 ) {
 
     fun stepsToFarthestFromStart(): Int {
@@ -54,8 +45,8 @@ data class PipeNetwork(
         val visited = mutableSetOf(startingTile)
         // list with tile, depth and previous tile coord
         val tilesToVisit = mutableListOf(
-            Triple(pipesGrid[startingTile.connection1.first][startingTile.connection1.second], 1, startingTile.coord),
-            Triple(pipesGrid[startingTile.connection2.first][startingTile.connection2.second], 1, startingTile.coord)
+            Triple(pipesGrid[startingTile.connection1], 1, startingTile.coord),
+            Triple(pipesGrid[startingTile.connection2], 1, startingTile.coord)
         )
         while (true) {
             if (tilesToVisit.isEmpty()) {
@@ -69,7 +60,7 @@ data class PipeNetwork(
             val nextConnection = currTile.nextConnection(previousTileCoord)
             tilesToVisit.add(
                 Triple(
-                    pipesGrid[nextConnection.first][nextConnection.second],
+                    pipesGrid[nextConnection],
                     depth + 1,
                     currTile.coord
                 )
@@ -77,144 +68,57 @@ data class PipeNetwork(
         }
     }
 
-    private fun cleanGrid(): Array<Array<Tile>> {
-        val cleanGrid = Array(pipesGrid.size) { Array(pipesGrid[0].size) { INVALID_TILE } }
-
-
-        var prevTile = startingTile
-        var currTile = pipesGrid[startingTile.connection1.first][startingTile.connection1.second]
-        cleanGrid[startingTile.coord.first][startingTile.coord.second] = startingTile
-        do {
-            cleanGrid[currTile.coord.first][currTile.coord.second] = currTile
-            val nextCoord = currTile.nextConnection(prevTile.coord)
-            prevTile = currTile
-            currTile = pipesGrid[nextCoord.first][nextCoord.second]
-        } while (currTile != startingTile)
-
-        cleanGrid.forEachIndexed { i, tiles ->
-            tiles.forEachIndexed { j, tile ->
-                if (tile == INVALID_TILE) {
-                    cleanGrid[i][j] = Tile(Pipe.GROUND, Pair(i, j))
-                }
-            }
-        }
-
-        return cleanGrid
-    }
-
-    fun enclosedTiles(): Int {
-
-        val cleanGrid = cleanGrid()
-        val enclosedTiles = mutableSetOf<Tile>()
-        var isInside = false
-
-        /*
-            We go line by line, left-to-right in a clean grind (containing only pipes in the loop)
-            We have a boolean signalling if we are inside or outside the loop
-            Whenever we read:
-              - a | pipe; or
-              - a L7 pipe sequence (might have any number of - in between, f.e L---7); or
-              - an FJ pipe sequence (might have any number of - in between, f.e F---J); or
-             It means we crossed the loop then we flip the boolean.
-             Whenever we read a . (ground), if we are inside the loop, it is an enclosed tile.
-         */
-        cleanGrid.forEachIndexed { i, tiles ->
-            var j = 0
-            while (j < tiles.size) {
-                val tile = tiles[j]
-                if (tile.pipe == Pipe.GROUND) {
-                    if(isInside) {
-                        enclosedTiles.add(tile)
-                    }
-                }
-
-                if(tile.pipe == Pipe.VERTICAL) {
-                    isInside = !isInside
-                }
-
-                if (tile.pipe == Pipe.NORTH_EAST_90DEG/*L*/) {
-                    // Found L, walk until we find either a J or a 7
-                    j++
-                    while (tiles[j].pipe != Pipe.NORTH_WEST_90DEG && tiles[j].pipe != Pipe.SOUTH_WEST_90DEG) {
-                        j++
-                    }
-                    val foundTile = tiles[j]
-                    if (foundTile.pipe == Pipe.SOUTH_WEST_90DEG) {
-                        // found a L(-)*7
-                        isInside = !isInside
-                    }
-                    // otherwise it is a L(-)*J, then nothing to do
-                }
-
-                if (tile.pipe == Pipe.SOUTH_EAST_90DEG/*F*/) {
-                    // Found F, walk until we find either a J or a 7
-                    j++
-                    while (tiles[j].pipe != Pipe.NORTH_WEST_90DEG && tiles[j].pipe != Pipe.SOUTH_WEST_90DEG) {
-                        // Found a '-', keep going
-                        j++
-                    }
-                    val foundTile = tiles[j]
-                    if (foundTile.pipe == Pipe.NORTH_WEST_90DEG) {
-                        // found a F(-)*J
-                        isInside = !isInside
-                    }
-                    // otherwise it is a F(-)*7, then nothing to do
-                }
-                j++
-            }
-        }
-
-        return enclosedTiles.size
-    }
+    fun enclosedTiles() = pipesGrid.enclosedTiles(startingTile)
 
     companion object {
 
-        private val INVALID_TILE = Tile(Pipe.GROUND, Pair(-1, -1))
+        val INVALID_TILE = Tile(Pipe.GROUND, Coord(-1, -1))
         fun parse(input: List<String>): PipeNetwork {
-            val pipesChart = Array(input.size) { Array(input[0].length) { INVALID_TILE } }
+            val pipesChart = PipeGrid(input.size, input[0].length)
             var startingTile = INVALID_TILE
             input.forEachIndexed { i, line ->
                 line.forEachIndexed { j, char ->
-                    if (char == 'S') {
-                        startingTile = resolveStartingTile(input, Pair(i, j))
-                        pipesChart[i][j] = startingTile
+                    val tileCoord = Coord(i, j)
+                    val tile = if (char == 'S') {
+                        startingTile = resolveStartingTile(input, tileCoord)
+                        startingTile
                     } else {
-                        pipesChart[i][j] = Tile(Pipe.parse(char), Pair(i, j))
+                        Tile(Pipe.parse(char), tileCoord)
                     }
+                    pipesChart[tileCoord] = tile
                 }
             }
 
             return PipeNetwork(pipesChart, startingTile)
         }
 
-        private fun resolveStartingTile(input: List<String>, coord: Pair<Int, Int>): Tile {
-            val inputDimensions = Pair(input.size, input[0].length)
-            val northCoord = coord + NORTH
-            val tileNorth = if (isInvalidCoord(northCoord, inputDimensions)) {
+        private fun resolveStartingTile(input: List<String>, coord: Coord): Tile {
+            val northCoord = coord.north()
+            val tileNorth = if (northCoord.isInvalidCoord(input.size, input[0].length)) {
                 INVALID_TILE
             } else {
-                Tile(Pipe.parse(input[northCoord.first][northCoord.second]), northCoord)
+                Tile(Pipe.parse(input.at(northCoord)), northCoord)
             }
 
-            val eastCoord = coord + EAST
-            val tileEast = if (isInvalidCoord(eastCoord, inputDimensions)) {
+            val eastCoord = coord.east()
+            val tileEast = if (eastCoord.isInvalidCoord(input.size, input[0].length)) {
                 INVALID_TILE
             } else {
-                Tile(Pipe.parse(input[eastCoord.first][eastCoord.second]), eastCoord)
+                Tile(Pipe.parse(input.at(eastCoord)), eastCoord)
             }
 
-            val southCoord = coord + SOUTH
-            val tileSouth = if (isInvalidCoord(southCoord, inputDimensions)) {
+            val southCoord = coord.south()
+            val tileSouth = if (southCoord.isInvalidCoord(input.size, input[0].length)) {
                 INVALID_TILE
             } else {
-                Tile(Pipe.parse(input[southCoord.first][southCoord.second]), southCoord)
+                Tile(Pipe.parse(input.at(southCoord)), southCoord)
             }
 
-            val westCoord = coord + WEST
-            val tileWest = if (isInvalidCoord(westCoord, inputDimensions)) {
+            val westCoord = coord.west()
+            val tileWest = if (westCoord.isInvalidCoord(input.size, input[0].length)) {
                 INVALID_TILE
             } else {
-                Tile(Pipe.parse(input[westCoord.first][westCoord.second]), westCoord)
+                Tile(Pipe.parse(input.at(westCoord)), westCoord)
             }
 
             val connectingToStart = listOf(tileNorth, tileEast, tileSouth, tileWest)
@@ -234,60 +138,191 @@ data class PipeNetwork(
                 )
             }
 
-            return Tile(
-                Pipe.fromConnectingPair(Pair(connectingToStart[0].coord, connectingToStart[1].coord), coord),
-                coord
-            )
+            val pipe = when (Pair(connectingToStart[0].coord, connectingToStart[1].coord)) {
+                Pair(northCoord, southCoord) -> Pipe.VERTICAL
+                Pair(eastCoord, westCoord) -> Pipe.HORIZONTAL
+                Pair(northCoord, eastCoord) -> Pipe.NORTH_EAST_90DEG
+                Pair(northCoord, westCoord) -> Pipe.NORTH_WEST_90DEG
+                Pair(eastCoord, southCoord) -> Pipe.SOUTH_EAST_90DEG
+                Pair(southCoord, westCoord) -> Pipe.SOUTH_WEST_90DEG
+                else -> throw IllegalStateException("Could not find Pipe from $connectingToStart")
+            }
+            return Tile(pipe, coord)
         }
 
-        private fun isInvalidCoord(coord: Pair<Int, Int>, gridDimension: Pair<Int, Int>) =
-            coord.first < 0 || coord.first >= gridDimension.first || coord.second < 0 || coord.second >= gridDimension.second
+    }
+}
+
+class PipeGrid(
+    private val matrix: Array<Array<Tile>>
+) {
+
+    private val lineSize = matrix.size
+    private val columnSize = matrix[0].size
+
+    constructor(lineSize: Int, columnSize: Int) :
+            this(Array(lineSize) { Array(columnSize) { PipeNetwork.INVALID_TILE } })
+
+    fun print() {
+        matrix.forEach { tiles ->
+            tiles.forEach {
+                print(it.pipe)
+            }
+            kotlin.io.println()
+        }
+    }
+
+    operator fun set(coord: Coord, value: Tile) {
+        matrix[coord.line][coord.column] = value
+    }
+
+    operator fun get(coord: Coord): Tile = matrix[coord.line][coord.column]
+
+
+    private fun cleanGrid(startingTile: Tile): PipeGrid {
+        val cleanGrid = PipeGrid(lineSize = lineSize, columnSize = columnSize)
+
+        var prevTile = startingTile
+        var currTile = this[startingTile.connection1]
+        cleanGrid[startingTile.coord] = startingTile
+        do {
+            cleanGrid[currTile.coord] = currTile
+            val nextCoord = currTile.nextConnection(prevTile.coord)
+            prevTile = currTile
+            currTile = this[nextCoord]
+        } while (currTile != startingTile)
+
+        cleanGrid.convertInvalidToGroundTiles()
+
+        return cleanGrid
+    }
+
+    fun enclosedTiles(startingTile: Tile): Int {
+
+        val cleanGrid = cleanGrid(startingTile)
+        val enclosedTiles = mutableSetOf<Tile>()
+        var isInside = false
+
+        /*
+            We go line by line, left-to-right in a clean grind (containing only pipes in the loop)
+            We have a boolean signalling if we are inside or outside the loop
+            Whenever we read:
+              - a | pipe; or
+              - a L7 pipe sequence (might have any number of - in between, f.e L---7); or
+              - an FJ pipe sequence (might have any number of - in between, f.e F---J); or
+             It means we crossed the loop then we flip the boolean.
+             Whenever we read a . (ground), if we are inside the loop, it is an enclosed tile.
+         */
+        cleanGrid.forEachLine { tiles ->
+            var j = 0
+            while (j < tiles.size) {
+                val tile = tiles[j]
+                if (tile.pipe == Pipe.GROUND) {
+                    if (isInside) {
+                        enclosedTiles.add(tile)
+                    }
+                }
+
+                if (tile.pipe == Pipe.VERTICAL) {
+                    isInside = !isInside
+                }
+
+                if (tile.pipe == Pipe.NORTH_EAST_90DEG/*L*/ || tile.pipe == Pipe.SOUTH_EAST_90DEG/*F*/) {
+                    val initCurvePipe = tile.pipe
+                    // Found L, walk until we find either a J or a 7
+                    j++
+                    while (tiles[j].pipe == Pipe.HORIZONTAL) { j++ }
+                    val finalCurvePipe = tiles[j].pipe
+                    when (Pair(initCurvePipe, finalCurvePipe)) {
+                        Pair(Pipe.NORTH_EAST_90DEG, Pipe.SOUTH_WEST_90DEG), // L7
+                        Pair(Pipe.SOUTH_EAST_90DEG, Pipe.NORTH_WEST_90DEG) -> { // FJ
+                            isInside = !isInside
+                        }
+
+                        else -> {} // do nothing
+                    }
+                }
+                j++
+            }
+        }
+
+        return enclosedTiles.size
+    }
+
+    private fun forEachLine(action: (Array<Tile>) -> Unit) {
+        for (tiles in matrix) action(tiles)
+    }
+
+    private fun convertInvalidToGroundTiles() {
+        matrix.forEachIndexed { i, tiles ->
+            tiles.forEachIndexed { j, tile ->
+                if (tile == PipeNetwork.INVALID_TILE) {
+                    matrix[i][j] = Tile(Pipe.GROUND, Coord(i, j))
+                }
+            }
+        }
+    }
+}
+
+private fun List<String>.at(coord: Coord): Char = this[coord.line][coord.column]
+
+data class Coord(val line: Int, val column: Int) {
+    fun isInvalidCoord(lineSize: Int, columnSize: Int) =
+        line < 0 || line >= lineSize || column < 0 || column >= columnSize
+
+    fun north() = NORTH.invoke(this)
+    fun east() = EAST.invoke(this)
+    fun south() = SOUTH.invoke(this)
+    fun west() = WEST.invoke(this)
+
+    companion object {
+        val NORTH: (Coord) -> Coord = { coord -> Coord(coord.line - 1, coord.column) }
+        val EAST: (Coord) -> Coord = { coord -> Coord(coord.line, coord.column + 1) }
+        val SOUTH: (Coord) -> Coord = { coord -> Coord(coord.line + 1, coord.column) }
+        val WEST: (Coord) -> Coord = { coord -> Coord(coord.line, coord.column - 1) }
     }
 }
 
 data class Tile(
     val pipe: Pipe,
-    val coord: Pair<Int, Int>
+    val coord: Coord
 ) {
-    val connection1: Pair<Int, Int> = pipe.connection1(coord)
-    val connection2: Pair<Int, Int> = pipe.connection2(coord)
-    fun connectsTo(coord: Pair<Int, Int>) = this.connection1 == coord || this.connection2 == coord
+    val connection1: Coord = pipe.connection1(coord)
+    val connection2: Coord = pipe.connection2(coord)
+    fun connectsTo(coord: Coord) = this.connection1 == coord || this.connection2 == coord
 
-    fun nextConnection(coord: Pair<Int, Int>) = if (coord == connection1) {
-        connection2
-    } else if (coord == connection2) {
-        connection1
-    } else {
-        throw IllegalArgumentException("Passed coord $coord is not one of the connection of this pipe $this")
+    fun nextConnection(coord: Coord) = when (coord) {
+        connection1 -> connection2
+        connection2 -> connection1
+        else -> throw IllegalArgumentException("Passed coord $coord is not one of the connection of this pipe $this")
     }
 }
 
 enum class Pipe(
     private val value: Char,
-    private val connection1Modifier: Pair<Int, Int>,
-    private val connection2Modifier: Pair<Int, Int>,
+    private val connection1Modifier: (Coord) -> Coord,
+    private val connection2Modifier: (Coord) -> Coord,
 ) {
 
     /*
      * Connection always go clockwise starting at north. NORTH, EAST, SOUTH, WEST
      */
-    VERTICAL('|', NORTH, SOUTH),        //    | is a vertical pipe connecting north and south.
-    HORIZONTAL('-', EAST, WEST),        //    - is a horizontal pipe connecting east and west.
-    NORTH_EAST_90DEG('L', NORTH, EAST), //    L is a 90-degree bend connecting north and east.
-    NORTH_WEST_90DEG('J', NORTH, WEST), //    J is a 90-degree bend connecting north and west.
-    SOUTH_WEST_90DEG('7', SOUTH, WEST), //    7 is a 90-degree bend connecting south and west.
-    SOUTH_EAST_90DEG('F', EAST, SOUTH), //    F is a 90-degree bend connecting south and east.
-    GROUND('.', Pair(0, 0), Pair(0, 0));//    . is ground; there is no pipe in this tile.
+    VERTICAL('|', Coord.NORTH, Coord.SOUTH),        //    | is a vertical pipe connecting north and south.
+    HORIZONTAL('-', Coord.EAST, Coord.WEST),        //    - is a horizontal pipe connecting east and west.
+    NORTH_EAST_90DEG('L', Coord.NORTH, Coord.EAST), //    L is a 90-degree bend connecting north and east.
+    NORTH_WEST_90DEG('J', Coord.NORTH, Coord.WEST), //    J is a 90-degree bend connecting north and west.
+    SOUTH_WEST_90DEG('7', Coord.SOUTH, Coord.WEST), //    7 is a 90-degree bend connecting south and west.
+    SOUTH_EAST_90DEG('F', Coord.EAST, Coord.SOUTH), //    F is a 90-degree bend connecting south and east.
+    GROUND('.', { it }, { it });//    . is ground; there is no pipe in this tile.
 
-    fun connection1(coord: Pair<Int, Int>): Pair<Int, Int> = coord + connection1Modifier
-    fun connection2(coord: Pair<Int, Int>): Pair<Int, Int> = coord + connection2Modifier
+    fun connection1(coord: Coord): Coord = connection1Modifier.invoke(coord)
+    fun connection2(coord: Coord): Coord = connection2Modifier.invoke(coord)
 
     override fun toString(): String {
         return value.toString()
     }
 
     companion object {
-
         fun parse(input: Char): Pipe = when (input) {
             '|' -> VERTICAL
             '-' -> HORIZONTAL
@@ -298,33 +333,5 @@ enum class Pipe(
             '.' -> GROUND
             else -> throw IllegalArgumentException("Unexpected char $input when parsing Pipe")
         }
-
-        fun fromConnectingPair(connectingPair: Pair<Pair<Int, Int>, Pair<Int, Int>>, pivot: Pair<Int, Int>): Pipe {
-            // assuming connectingPair is in order: NORTH, EAST, SOUTH, WEST
-            val offset: Pair<Pair<Int, Int>, Pair<Int, Int>> =
-                Pair(connectingPair.first - pivot, connectingPair.second - pivot)
-
-
-            return when (offset) {
-                Pair(NORTH, SOUTH) -> VERTICAL
-                Pair(EAST, WEST) -> HORIZONTAL
-                Pair(NORTH, EAST) -> NORTH_EAST_90DEG
-                Pair(NORTH, WEST) -> NORTH_WEST_90DEG
-                Pair(EAST, SOUTH) -> SOUTH_EAST_90DEG
-                Pair(SOUTH, WEST) -> SOUTH_WEST_90DEG
-                else -> throw IllegalStateException("Could not find Pipe from connectingPair=$connectingPair and pivot=$pivot")
-            }
-        }
     }
 }
-
-private val NORTH = Pair(-1, 0)
-private val SOUTH = Pair(1, 0)
-private val EAST = Pair(0, 1)
-private val WEST = Pair(0, -1)
-
-private operator fun Pair<Int, Int>.plus(other: Pair<Int, Int>): Pair<Int, Int> =
-    Pair(this.first + other.first, this.second + other.second)
-
-private operator fun Pair<Int, Int>.minus(other: Pair<Int, Int>): Pair<Int, Int> =
-    Pair(this.first - other.first, this.second - other.second)
