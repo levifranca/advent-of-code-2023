@@ -33,7 +33,7 @@ fun main() {
     part2(input).println()
 }
 
-data class PipeNetwork(
+private data class PipeNetwork(
     private val pipesGrid: PipeGrid,
     private val startingTile: Tile
 ) {
@@ -153,7 +153,7 @@ data class PipeNetwork(
     }
 }
 
-class PipeGrid(
+private class PipeGrid(
     private val matrix: Array<Array<Tile>>
 ) {
 
@@ -266,7 +266,7 @@ class PipeGrid(
 
 private fun List<String>.at(coord: Coord): Char = this[coord.line][coord.column]
 
-data class Coord(val line: Int, val column: Int) {
+private data class Coord(val line: Int, val column: Int) {
     fun isInvalidCoord(lineSize: Int, columnSize: Int) =
         line < 0 || line >= lineSize || column < 0 || column >= columnSize
 
@@ -283,7 +283,7 @@ data class Coord(val line: Int, val column: Int) {
     }
 }
 
-data class Tile(
+private data class Tile(
     val pipe: Pipe,
     val coord: Coord
 ) {
@@ -298,7 +298,7 @@ data class Tile(
     }
 }
 
-enum class Pipe(
+private enum class Pipe(
     private val value: Char,
     private val connection1Modifier: (Coord) -> Coord,
     private val connection2Modifier: (Coord) -> Coord,
