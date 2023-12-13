@@ -6,12 +6,17 @@ import kotlin.math.pow
 
 fun main() {
     fun part1(input: List<String>): Int {
-        return SpringsReport.parse(input).arrangements().sumOf { it.count() }
+        return SpringsReport.parse(input).arrangementsCounts().sum()
     }
 
     fun part2(input: List<String>): Int {
-        return SpringsReport.parse(input).unfoldedArrangements().sumOf { it.count() }
+        return SpringsReport.parse(input).unfoldedArrangementsCounts().sum()
     }
+
+//    check(recurse("??", listOf(1)).also { it.println() } == 2)
+//    check(recurse("?#??##?", listOf(2, 3)).also { it.println() } == 3)
+//    check(recurse("#??##?", listOf(1, 3)).also { it.println() } == 2)
+//    check(recurse("#??##?", listOf(2, 3)) == 1)
 
     // test if implementation meets criteria from the description, like:
     val testInput = readInput("day12/Day12_test")
@@ -20,7 +25,7 @@ fun main() {
 
     val input = readInput("day12/Day12")
     part1(input).println()
-    part2(input).println()
+    //part2(input).println()
 }
 
 private class SpringsReport(
@@ -28,11 +33,12 @@ private class SpringsReport(
 ) {
 
     fun arrangements(): List<List<CharArray>> = springsRows.map(RowRecord::possibleArrangements)
+    fun arrangementsCounts(): List<Int> = springsRows.map(RowRecord::possibleArrangementCount)
 
-    fun unfoldedArrangements(): List<List<CharArray>> = springsRows
+    fun unfoldedArrangementsCounts(): List<Int> = springsRows
         .asSequence()
         .map(RowRecord::unfold)
-        .map(RowRecord::possibleArrangements)
+        .map(RowRecord::possibleArrangementCount)
         .toList()
 
     companion object {
@@ -91,6 +97,11 @@ private data class RowRecord(
         return possibleArrangements
     }
 
+    fun possibleArrangementCount(): Int =
+        recurse(springs.concatToString(), groupsOfDamagedSprings)
+    //.also { it.println() }
+
+
     private fun isPossible(arrangement: CharArray): Boolean {
         if (arrangement.contains('?')) {
             throw IllegalStateException("arrangement should not contain ?")
@@ -109,6 +120,89 @@ private data class RowRecord(
         )
     }
 }
+
+fun recurse(springs: String, groupsOfDamagedSprings: List<Int>, depth: Int = 0): Int {
+    if (springs.isEmpty()) {
+        if (groupsOfDamagedSprings.isEmpty()) {
+            //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = 1")
+            return 1
+        }
+        //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = 0")
+        return 0
+    }
+    when (springs[0]) {
+        '.' -> {
+            val result = recurse(springs.substring(1, springs.length), groupsOfDamagedSprings, depth + 1)
+            //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = $result")
+            return result
+        }
+
+        '#' -> {
+            if (groupsOfDamagedSprings.isEmpty()) {
+                // found damaged but the groups are over. Invalid arrangement
+                //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = 0")
+                return 0
+            }
+
+            val groupSize = groupsOfDamagedSprings[0]
+            if (springs.length < groupSize) {
+                // invalid group found
+                //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = 0")
+                return 0
+            }
+            val group = springs.substring(0, groupSize)
+            if (group.contains('.')) {
+                // invalid group found
+                //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = 0")
+                return 0
+            }
+
+            if (springs.length == groupSize) {
+                // recurse one last time with empty string
+                val result = recurse(
+                    "",
+                    groupsOfDamagedSprings.subList(1, groupsOfDamagedSprings.size),
+                    depth + 1
+                )
+                //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = $result")
+                return result
+            }
+
+            val charAfterGroup = springs[groupSize]
+            when (charAfterGroup) {
+                '#' -> {
+                    // invalid group is larger than expected
+                    //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = 0")
+                    return 0
+                }
+
+                '?',
+                '.' -> {
+                    // non-last group found successfully, recurse with the rest of the string
+                    val result = recurse(
+                        springs.substring(groupSize + 1),
+                        groupsOfDamagedSprings.subList(1, groupsOfDamagedSprings.size),
+                        depth + 1
+                    )
+                    //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = $result")
+                    return result
+                }
+
+                else -> throw IllegalStateException("WTF? $springs $groupsOfDamagedSprings")
+            }
+        }
+
+        '?' -> {
+            val result = recurse('.' + springs.substring(1, springs.length), groupsOfDamagedSprings, depth + 1) +
+                    recurse('#' + springs.substring(1, springs.length), groupsOfDamagedSprings, depth + 1)
+            //println("${(0..depth).joinToString("") { "\t" }}recurse $springs $groupsOfDamagedSprings = $result")
+            return result
+        }
+
+        else -> throw IllegalStateException("Char at $springs [0] is invalid: ${springs[0]}")
+    }
+}
+
 
 private operator fun BooleanArray.inc(): BooleanArray {
     for (i in indices.reversed()) {
